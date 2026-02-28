@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clarifai — Know Before You Sign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900family=Syne:wght@400;500;600;700;800&family=DM+Sansfamily=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+
+/* ═══════════════════════════════
+   TOKENS
+═══════════════════════════════ */
+:root {
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* violet brand */
+  --v0: #E8E2FF;
+  --v1: #C4B4FF;
+  --v2: #9B7EFF;
+  --v3: #6C4EE8;
+  --v4: #4B33B5;
+  --v5: #2E1E7A;
+
+  --transition-theme: background 0.45s var(--ease), color 0.45s var(--ease), border-color 0.45s var(--ease);
+}
+
+[data-theme="dark"] {
+  --bg:        #050509;
+  --bg2:       #09090F;
+  --bg3:       #0E0D17;
+  --surface:   rgba(255,255,255,0.04);
+  --surface2:  rgba(255,255,255,0.07);
+  --border:    rgba(255,255,255,0.07);
+  --border-v:  rgba(108,78,232,0.28);
+  --text:      #F2F0FF;
+  --text2:     rgba(242,240,255,0.5);
+  --text3:     rgba(242,240,255,0.25);
+  --beam-col:  rgba(108,78,232,0.55);
+  --beam-col2: rgba(90,60,200,0.3);
+  --doc-face:  rgba(22,20,40,0.9);
+  --doc-border: rgba(255,255,255,0.1);
+  --doc-line:  rgba(255,255,255,0.08);
+  --doc-line2: rgba(255,255,255,0.04);
+  --doc-glow:  rgba(155,126,255,0.12);
+  --doc-shadow: rgba(0,0,0,0.7);
+}
+
+[data-theme="light"] {
+  --bg:        #F7F6FF;
+  --bg2:       #EEEEFF;
+  --bg3:       #E8E6FF;
+  --surface:   rgba(0,0,0,0.03);
+  --surface2:  rgba(0,0,0,0.05);
+  --border:    rgba(0,0,0,0.07);
+  --border-v:  rgba(108,78,232,0.2);
+  --text:      #12101E;
+  --text2:     rgba(18,16,30,0.5);
+  --text3:     rgba(18,16,30,0.25);
+  --beam-col:  rgba(108,78,232,0.2);
+  --beam-col2: rgba(140,110,255,0.12);
+  --doc-face:  rgba(255,255,255,0.96);
+  --doc-border: rgba(108,78,232,0.15);
+  --doc-line:  rgba(0,0,0,0.07);
+  --doc-line2: rgba(0,0,0,0.04);
+  --doc-glow:  rgba(108,78,232,0.06);
+  --doc-shadow: rgba(80,60,160,0.15);
+}
+
+/* ═══════════════════════════════
+   RESET
+═══════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  overflow-x: hidden;
+  transition: var(--transition-theme);
+  cursor: none;
+}
+
+/* ═══════════════════════════════
+   CURSOR
+═══════════════════════════════ */
+#cur {
+  position: fixed; width: 8px; height: 8px;
+  background: var(--v2);
+  border-radius: 50%;
+  pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: width .25s, height .25s;
+  mix-blend-mode: screen;
+}
+[data-theme="light"] #cur { mix-blend-mode: multiply; }
+#cur-ring {
+  position: fixed; width: 32px; height: 32px;
+  border: 1px solid var(--border-v);
+  border-radius: 50%;
+  pointer-events: none; z-index: 9998;
+  transform: translate(-50%,-50%);
+  transition: border-color .3s;
+}
+body.hovering #cur { width: 14px; height: 14px; }
+body.hovering #cur-ring { border-color: var(--v2); }
+
+/* ═══════════════════════════════
+   NAV
+═══════════════════════════════ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 52px;
+  height: 64px;
+  border-bottom: 1px solid transparent;
+  transition: var(--transition-theme), border-color .4s, backdrop-filter .4s;
+}
+nav.scrolled {
+  background: var(--bg);
+  border-color: var(--border);
+  backdrop-filter: blur(20px);
+}
+
+.logo {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-weight: 800; font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+.logo em {
+  font-style: normal;
+  color: var(--v2);
+}
+
+.nav-right { display: flex; align-items: center; gap: 14px; }
+
+/* Theme toggle */
+.theme-toggle {
+  width: 52px; height: 28px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition-theme);
+  flex-shrink: 0;
+}
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px;
+  background: var(--v2);
+  border-radius: 50%;
+  transition: transform .35s var(--ease), background .35s;
+  box-shadow: 0 0 10px var(--v3);
+}
+[data-theme="light"] .theme-toggle::after { transform: translateX(24px); }
+
+.theme-icon {
+  position: absolute;
+  font-size: 11px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.theme-icon.moon { right: 7px; }
+.theme-icon.sun { left: 7px; }
+
+.nav-btn {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 13px; font-weight: 600;
+  padding: 8px 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border-v);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background .25s, color .25s, transform .2s;
+}
+.nav-btn:hover { background: var(--v3); color: #fff; transform: translateY(-1px); border-color: var(--v3); }
+.nav-btn.fill { background: var(--v3); color: #fff; border-color: var(--v3); }
+.nav-btn.fill:hover { background: var(--v4); }
+
+/* ═══════════════════════════════
+   HERO
+═══════════════════════════════ */
+.hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+  padding-top: 64px;
+}
+
+/* Light beam — the dramatic atmosphere element */
+.beam-wrap {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Primary beam — cone from upper-center */
+.beam {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120vw;
+  height: 130vh;
+  background: conic-gradient(
+    from 80deg at 50% 0%,
+    transparent 0deg,
+    var(--beam-col2) 10deg,
+    var(--beam-col) 18deg,
+    rgba(155,126,255,0.6) 22deg,
+    rgba(200,180,255,0.4) 24deg,
+    rgba(155,126,255,0.6) 26deg,
+    var(--beam-col) 30deg,
+    var(--beam-col2) 38deg,
+    transparent 48deg
+  );
+  filter: blur(1px);
+  opacity: 0;
+  animation: beamIn 1.4s var(--ease) .3s forwards;
+}
+[data-theme="light"] .beam { opacity: 0; animation: beamInLight 1.4s var(--ease) .3s forwards; }
+
+@keyframes beamIn { to { opacity: 1; } }
+@keyframes beamInLight { to { opacity: 0.5; } }
+
+/* Ambient glow behind docs */
+.beam-glow {
+  position: absolute;
+  width: 700px; height: 700px;
+  top: -100px; left: 50%; transform: translateX(-50%);
+  background: radial-gradient(ellipse, var(--beam-col) 0%, transparent 65%);
+  filter: blur(60px);
+  opacity: 0;
+  animation: beamIn 2s ease .5s forwards;
+}
+[data-theme="light"] .beam-glow { opacity: 0; animation: beamInLight 2s ease .5s forwards; }
+
+/* Noise grain overlay */
+.grain {
+  position: absolute; inset: 0;
+  opacity: .025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* ── Hero Left ── */
+.hero-left {
+  padding: 80px 60px 80px 80px;
+  position: relative; z-index: 2;
+}
+
+.hero-eyebrow {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v2);
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp .8s var(--ease) .6s forwards;
+}
+.eyebrow-line { width: 28px; height: 1px; background: var(--v2); }
+
+.hero h1 {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: clamp(40px, 4.5vw, 66px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  margin-bottom: 22px;
+  opacity: 0;
+  animation: fadeUp .9s var(--ease) .75s forwards;
+}
+
+.hero h1 .accent {
+  color: var(--v2);
+  position: relative;
+  display: inline-block;
+}
+.hero h1 .accent::after {
+  content: '';
+  position: absolute;
+  bottom: 2px; left: 0; right: 0; height: 2px;
+  background: var(--v2);
+  opacity: 0.3;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: underlineIn .6s var(--ease) 1.5s forwards;
+}
+@keyframes underlineIn { to { transform: scaleX(1); } }
+
+.hero-body {
+  font-size: 16px;
+  color: var(--text2);
+  line-height: 1.8;
+  max-width: 420px;
+  margin-bottom: 44px;
+  opacity: 0;
+  animation: fadeUp .9s var(--ease) .9s forwards;
+}
+
+.hero-actions {
+  display: flex; align-items: center; gap: 14px;
+  opacity: 0;
+  animation: fadeUp .9s var(--ease) 1.05s forwards;
+}
+
+.btn-main {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 14px 30px;
+  background: var(--v3);
+  color: #fff;
+  border: none; border-radius: 8px;
+  cursor: pointer;
+  transition: background .25s, transform .2s, box-shadow .3s;
+  box-shadow: 0 0 32px rgba(108,78,232,0.35);
+}
+.btn-main:hover { background: var(--v4); transform: translateY(-2px); box-shadow: 0 0 50px rgba(108,78,232,0.5); }
+
+.btn-text {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 13px; font-weight: 600;
+  color: var(--text2);
+  background: none; border: none; cursor: pointer;
+  transition: color .2s;
+}
+.btn-text:hover { color: var(--text); }
+.btn-text svg { transition: transform .2s; }
+.btn-text:hover svg { transform: translateX(3px); }
+
+.hero-note {
+  margin-top: 22px;
+  font-size: 12px;
+  color: var(--text3);
+  opacity: 0;
+  animation: fadeUp .8s var(--ease) 1.2s forwards;
+  letter-spacing: 0.01em;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Hero Right — 3D Documents ── */
+.hero-right {
+  position: relative;
+  height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  perspective: 1400px;
+  opacity: 0;
+  animation: fadeIn 1s ease 1s forwards;
+}
+@keyframes fadeIn { to { opacity:1; } }
+
+.docs-scene {
+  position: relative;
+  width: 520px; height: 660px;
+  transform-style: preserve-3d;
+}
+
+/* Individual document cards */
+.doc {
+  position: absolute;
+  width: 390px; height: 500px;
+  background: var(--doc-face);
+  border: 1px solid var(--doc-border);
+  border-radius: 10px;
+  padding: 36px 32px;
+  transform-style: preserve-3d;
+  transition: var(--transition-theme);
+  box-shadow:
+    0 30px 80px var(--doc-shadow),
+    0 0 0 1px var(--doc-border),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Light catch on doc top edge */
+.doc::before {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,180,255,0.6), transparent);
+  border-radius: 1px;
+}
+
+/* doc 1 — main, slightly tilted */
+.doc-1 {
+  top: 0; left: 0;
+  animation: docFloat1 7s ease-in-out infinite;
+  z-index: 3;
+}
+@keyframes docFloat1 {
+  0%,100% { transform: rotateX(8deg) rotateY(-14deg) rotateZ(-2deg) translateZ(20px); }
+  25%     { transform: rotateX(12deg) rotateY(-10deg) rotateZ(-1deg) translateZ(24px); }
+  50%     { transform: rotateX(6deg) rotateY(-18deg) rotateZ(-3deg) translateZ(16px); }
+  75%     { transform: rotateX(10deg) rotateY(-12deg) rotateZ(-2deg) translateZ(22px); }
+}
+
+/* doc 2 — behind, more tilted right */
+.doc-2 {
+  top: 50px; left: 80px;
+  z-index: 2;
+  animation: docFloat2 8s ease-in-out 1s infinite;
+}
+@keyframes docFloat2 {
+  0%,100% { transform: rotateX(14deg) rotateY(8deg) rotateZ(3deg) translateZ(-10px); }
+  33%     { transform: rotateX(10deg) rotateY(12deg) rotateZ(4deg) translateZ(-6px); }
+  66%     { transform: rotateX(18deg) rotateY(6deg) rotateZ(2deg) translateZ(-14px); }
+}
+
+/* doc 3 — furthest back, more flat */
+.doc-3 {
+  top: 100px; left: 160px;
+  z-index: 1;
+  opacity: 0.6;
+  animation: docFloat3 9s ease-in-out 2s infinite;
+}
+@keyframes docFloat3 {
+  0%,100% { transform: rotateX(22deg) rotateY(16deg) rotateZ(5deg) translateZ(-40px); }
+  50%     { transform: rotateX(18deg) rotateY(20deg) rotateZ(6deg) translateZ(-35px); }
+}
+
+/* Glow behind docs */
+.doc-glow {
+  position: absolute;
+  width: 480px; height: 480px;
+  top: 50px; left: 80px;
+  background: radial-gradient(circle, var(--doc-glow), transparent 70%);
+  border-radius: 50%;
+  filter: blur(30px);
+  pointer-events: none;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%,100% { opacity: .6; transform: scale(1); }
+  50%     { opacity: 1; transform: scale(1.1); }
+}
+
+/* ── Document Internal Lines (simulated text) ── */
+.doc-header {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--doc-line);
+  display: flex; align-items: center; gap: 10px;
+}
+.doc-stamp {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, var(--v3), var(--v5));
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.doc-stamp svg { width: 20px; height: 20px; fill: #fff; opacity: .85; }
+.doc-header-lines { flex: 1; }
+.doc-h-line1 {
+  height: 10px; background: var(--doc-line);
+  border-radius: 3px; width: 80%; margin-bottom: 7px;
+}
+.doc-h-line2 {
+  height: 7px; background: var(--doc-line2);
+  border-radius: 3px; width: 55%;
+}
+
+.doc-body { display: flex; flex-direction: column; gap: 10px; }
+.doc-line {
+  height: 8px; background: var(--doc-line);
+  border-radius: 3px;
+}
+.doc-line.w100 { width: 100%; }
+.doc-line.w85  { width: 85%; }
+.doc-line.w92  { width: 92%; }
+.doc-line.w70  { width: 70%; }
+.doc-line.w78  { width: 78%; }
+.doc-line.w60  { width: 60%; }
+.doc-line.w95  { width: 95%; }
+.doc-line.gap  { margin-top: 10px; }
+
+/* Risk highlight bars within doc */
+.doc-risk {
+  margin-top: 14px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border-left: 2px solid;
+  display: flex; gap: 8px; align-items: center;
+}
+.doc-risk.r {
+  background: rgba(239,68,68,0.07);
+  border-color: #EF4444;
+}
+.doc-risk.y {
+  background: rgba(245,158,11,0.07);
+  border-color: #F59E0B;
+}
+.doc-risk.g {
+  background: rgba(34,197,94,0.07);
+  border-color: #22C55E;
+}
+.risk-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.r .risk-dot { background: #EF4444; }
+.y .risk-dot { background: #F59E0B; }
+.g .risk-dot { background: #22C55E; }
+.risk-lines { flex: 1; }
+.risk-line1 { height: 5px; background: var(--doc-line); border-radius: 2px; width: 70%; margin-bottom: 3px; }
+.risk-line2 { height: 4px; background: var(--doc-line2); border-radius: 2px; width: 50%; }
+
+/* signature area at bottom */
+.doc-footer {
+  position: absolute;
+  bottom: 18px; left: 20px; right: 20px;
+  border-top: 1px solid var(--doc-line);
+  padding-top: 10px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.sig-line {
+  width: 90px; height: 1px;
+  background: var(--doc-line);
+  position: relative;
+}
+.sig-line::before {
+  content: 'Signature';
+  position: absolute; bottom: 4px; left: 0;
+  font-size: 8px; color: var(--doc-line); letter-spacing: 0.05em;
+  font-family: 'DM Sans', sans-serif;
+}
+.sig-x {
+  font-size: 16px;
+  color: var(--v2);
+  opacity: 0.4;
+  font-family: cursive;
+  margin-bottom: -2px;
+}
+.doc-page-num {
+  font-size: 8px;
+  color: var(--text3);
+  font-family: 'Hanken Grotesk', sans-serif;
+}
+
+/* ═══════════════════════════════
+   MARQUEE STRIP
+═══════════════════════════════ */
+.strip {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 14px 0;
+  background: var(--bg2);
+  transition: var(--transition-theme);
+}
+.strip-track {
+  display: inline-flex; gap: 0;
+  animation: marquee 30s linear infinite;
+}
+.strip-item {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 0 32px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.strip-item .dot {
+  width: 4px; height: 4px;
+  background: var(--v2);
+  border-radius: 50%;
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ═══════════════════════════════
+   SECTIONS
+═══════════════════════════════ */
+.section { padding: 110px 80px; }
+.section-inner { max-width: 1100px; margin: 0 auto; }
+
+.s-label {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v2);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.s-label::before { content: ''; width: 20px; height: 1px; background: var(--v2); }
+
+.s-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: clamp(30px, 3.5vw, 48px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  margin-bottom: 16px;
+}
+
+.s-body {
+  font-size: 16px; color: var(--text2); line-height: 1.8; max-width: 480px;
+}
+
+/* ── HOW IT WORKS ── */
+.how { background: var(--bg2); transition: var(--transition-theme); }
+
+.how-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+.how-steps { display: flex; flex-direction: column; gap: 0; }
+
+.how-step {
+  display: flex; gap: 24px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  transition: var(--transition-theme);
+}
+.how-step:first-child { padding-top: 0; }
+.how-step:last-child { border-bottom: none; padding-bottom: 0; }
+
+.step-n {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 11px; font-weight: 700;
+  color: var(--v2);
+  letter-spacing: 0.08em;
+  padding-top: 3px;
+  min-width: 24px;
+}
+
+.step-content h3 {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 17px; font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 7px;
+}
+.step-content p { font-size: 14px; color: var(--text2); line-height: 1.7; }
+
+/* Upload preview panel */
+.how-panel {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  transition: var(--transition-theme);
+}
+.how-panel::before {
+  /* light edge */
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-v), transparent);
+  margin: -28px -28px 24px;
+  border-radius: 16px 16px 0 0;
+}
+
+.panel-topbar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 20px;
+}
+.panel-dots { display: flex; gap: 5px; }
+.panel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+
+.panel-upload {
+  border: 1.5px dashed var(--border-v);
+  border-radius: 10px;
+  padding: 30px 20px;
+  text-align: center;
+  background: var(--surface);
+  transition: border-color .3s, background .3s;
+  cursor: pointer;
+}
+.panel-upload:hover { border-color: var(--v2); background: var(--surface2); }
+
+.upload-icon-box {
+  width: 44px; height: 44px;
+  margin: 0 auto 12px;
+  background: var(--surface2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  border: 1px solid var(--border);
+}
+
+.panel-upload p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.panel-upload strong { color: var(--v2); font-weight: 500; }
+.panel-upload span { font-size: 11px; color: var(--text3); display: block; margin-top: 4px; }
+
+.panel-result {
+  margin-top: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.result-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+}
+.result-row.red   { background: rgba(239,68,68,0.06);  border-color: rgba(239,68,68,0.15);  }
+.result-row.amber { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.15); }
+.result-row.green { background: rgba(34,197,94,0.06);  border-color: rgba(34,197,94,0.15);  }
+
+.row-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.red   .row-dot { background: #EF4444; }
+.amber .row-dot { background: #F59E0B; }
+.green .row-dot { background: #22C55E; }
+.row-text { color: var(--text); }
+.row-tag {
+  margin-left: auto;
+  font-size: 10px; font-family: 'Hanken Grotesk', sans-serif; font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px; border-radius: 4px;
+}
+.red   .row-tag { color: #EF4444; background: rgba(239,68,68,0.1); }
+.amber .row-tag { color: #F59E0B; background: rgba(245,158,11,0.1); }
+.green .row-tag { color: #22C55E; background: rgba(34,197,94,0.1); }
+
+/* ── CATCHES ── */
+.catches { background: var(--bg); transition: var(--transition-theme); }
+
+.catches-header {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 60px; align-items: end;
+  margin-bottom: 56px;
+}
+.catches-header .s-body { max-width: 100%; }
+
+.catch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.catch-cell {
+  padding: 28px 26px;
+  background: var(--bg);
+  transition: background .3s, var(--transition-theme);
+}
+.catch-cell:hover { background: var(--bg2); }
+
+.catch-icon { font-size: 22px; margin-bottom: 14px; }
+.catch-name {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 6px; letter-spacing: -0.01em;
+}
+.catch-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+/* ── PRICING ── */
+.pricing { background: var(--bg2); transition: var(--transition-theme); }
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 52px;
+}
+
+.plan {
+  padding: 36px 30px;
+  background: var(--bg2);
+  position: relative;
+  transition: var(--transition-theme);
+}
+.plan.featured {
+  background: var(--bg3);
+}
+.plan.featured::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--v4), var(--v2), var(--v4));
+}
+
+.plan-tag {
+  display: inline-block;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--v2); padding: 3px 10px;
+  border: 1px solid var(--border-v);
+  border-radius: 4px;
+  margin-bottom: 18px;
+}
+
+.plan-name {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 20px; font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.plan-desc { font-size: 13px; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
+
+.plan-price {
+  display: flex; align-items: baseline; gap: 3px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.p-sym { font-size: 18px; color: var(--text2); font-weight: 400; }
+.p-num {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 44px; font-weight: 800;
+  line-height: 1; letter-spacing: -0.01em;
+}
+.p-per { font-size: 13px; color: var(--text2); margin-left: 4px; }
+
+.plan-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+.plan-list li {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13px; color: var(--text2); line-height: 1.5;
+}
+.plan-list li::before {
+  content: '—';
+  color: var(--v2); flex-shrink: 0;
+  font-family: 'Hanken Grotesk', sans-serif;
+}
+
+.plan-cta {
+  width: 100%; padding: 12px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 8px; cursor: pointer;
+  transition: all .2s;
+}
+.plan-cta.ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+}
+.plan-cta.ghost:hover { border-color: var(--border-v); color: var(--text); }
+.plan-cta.solid {
+  background: var(--v3); color: #fff; border: none;
+  box-shadow: 0 0 24px rgba(108,78,232,0.3);
+}
+.plan-cta.solid:hover { background: var(--v4); transform: translateY(-1px); }
+
+/* ── CTA ── */
+.cta-sect {
+  padding: 120px 80px;
+  background: var(--bg);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition-theme);
+}
+.cta-glow {
+  position: absolute;
+  width: 900px; height: 400px;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  background: radial-gradient(ellipse, var(--beam-col2), transparent 65%);
+  filter: blur(60px);
+  pointer-events: none;
+}
+.cta-sect .s-title { font-size: clamp(36px, 5vw, 64px); max-width: 700px; margin: 0 auto 18px; }
+.cta-sect .s-body { margin: 0 auto 44px; text-align: center; }
+.cta-actions { display: flex; gap: 12px; justify-content: center; }
+.cta-fine { font-size: 12px; color: var(--text3); margin-top: 16px; letter-spacing: 0.02em; }
+
+/* ── FOOTER ── */
+footer {
+  padding: 48px 80px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  transition: var(--transition-theme);
+}
+.footer-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-logo {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 16px; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--text);
+}
+.footer-logo em { font-style: normal; color: var(--v2); }
+.footer-links { display: flex; gap: 24px; }
+.footer-links a {
+  font-size: 13px; color: var(--text2);
+  text-decoration: none; transition: color .2s;
+}
+.footer-links a:hover { color: var(--text); }
+.footer-copy { font-size: 12px; color: var(--text3); }
+
+/* ═══════════════════════════════
+   REVEAL
+═══════════════════════════════ */
+.reveal {
+  opacity: 0; transform: translateY(28px);
+  transition: opacity .9s var(--ease), transform .9s var(--ease);
+}
+.reveal.on { opacity: 1; transform: none; }
+.rd1 { transition-delay: .1s; }
+.rd2 { transition-delay: .2s; }
+.rd3 { transition-delay: .3s; }
+.rd4 { transition-delay: .4s; }
+.rd5 { transition-delay: .5s; }
+
+/* ═══════════════════════════════
+   RESPONSIVE
+═══════════════════════════════ */
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; min-height: auto; }
+  .hero-right { height: 50vh; }
+  .hero-left { padding: 80px 32px 40px; }
+  nav { padding: 0 24px; }
+  .section { padding: 80px 32px; }
+  .how-grid, .catches-header, .pricing-grid { grid-template-columns: 1fr; }
+  .catch-grid { grid-template-columns: 1fr 1fr; }
+  .footer-inner { flex-direction: column; gap: 20px; }
+  .footer-links { flex-wrap: wrap; justify-content: center; }
+  .cta-sect { padding: 80px 32px; }
+  footer { padding: 48px 32px; }
+}
+
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-ring"></div>
+
+<!-- ═══ NAV ═══ -->
+<nav id="nav">
+  <a href="#" class="logo">Clarif<em>ai</em></a>
+  <div class="nav-right">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <span class="theme-icon moon">🌙</span>
+      <span class="theme-icon sun">☀️</span>
+    </button>
+    <button class="nav-btn" onclick="document.querySelector('.hero-left').scrollIntoView({behavior:'smooth'})">How it works</button>
+    <button class="nav-btn fill">Try Free</button>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="beam-wrap">
+    <div class="beam"></div>
+    <div class="beam-glow"></div>
+    <div class="grain"></div>
+  </div>
+
+  <!-- Left: copy -->
+  <div class="hero-left">
+    <div class="hero-eyebrow">
+      <span class="eyebrow-line"></span>
+      AI Contract Intelligence
+    </div>
+
+    <h1>
+      Read the fine<br>
+      print so you<br>
+      <span class="accent">don't have to.</span>
+    </h1>
+
+    <p class="hero-body">
+      Upload any contract, lease, or legal document. Clarifai finds every trap, risky clause, and one-sided term — and tells you exactly what to do about it.
+    </p>
+
+    <div class="hero-actions">
+      <button class="btn-main">
+        Analyze a Document
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="btn-text">
+        See sample report
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <p class="hero-note">2 free documents · No account needed · Results in &lt;10 seconds</p>
+  </div>
+
+  <!-- Right: 3D documents -->
+  <div class="hero-right">
+    <div class="doc-glow"></div>
+    <div class="docs-scene">
+
+      <!-- Doc 1 — front, main -->
+      <div class="doc doc-1">
+        <div class="doc-header">
+          <div class="doc-stamp">
+            <svg viewBox="0 0 16 16"><path d="M2 2h12v2H2zM2 6h8v1H2zM2 9h10v1H2zM2 12h6v1H2z"/></svg>
+          </div>
+          <div class="doc-header-lines">
+            <div class="doc-h-line1"></div>
+            <div class="doc-h-line2"></div>
+          </div>
+        </div>
+        <div class="doc-body">
+          <div class="doc-line w100"></div>
+          <div class="doc-line w85"></div>
+          <div class="doc-line w92"></div>
+          <div class="doc-line w70"></div>
+          <div class="doc-risk r">
+            <div class="risk-dot"></div>
+            <div class="risk-lines">
+              <div class="risk-line1"></div>
+              <div class="risk-line2"></div>
+            </div>
+          </div>
+          <div class="doc-line w78 gap"></div>
+          <div class="doc-line w95"></div>
+          <div class="doc-line w60"></div>
+          <div class="doc-risk y">
+            <div class="risk-dot"></div>
+            <div class="risk-lines">
+              <div class="risk-line1"></div>
+              <div class="risk-line2"></div>
+            </div>
+          </div>
+          <div class="doc-line w85 gap"></div>
+          <div class="doc-risk g">
+            <div class="risk-dot"></div>
+            <div class="risk-lines">
+              <div class="risk-line1"></div>
+              <div class="risk-line2"></div>
+            </div>
+          </div>
+        </div>
+        <div class="doc-footer">
+          <div class="sig-line"></div>
+          <div class="sig-x">✗</div>
+          <div class="doc-page-num">1 / 12</div>
+        </div>
+      </div>
+
+      <!-- Doc 2 — middle -->
+      <div class="doc doc-2">
+        <div class="doc-header">
+          <div class="doc-stamp">
+            <svg viewBox="0 0 16 16"><path d="M2 2h12v2H2zM2 6h8v1H2zM2 9h10v1H2zM2 12h6v1H2z"/></svg>
+          </div>
+          <div class="doc-header-lines">
+            <div class="doc-h-line1"></div>
+            <div class="doc-h-line2"></div>
+          </div>
+        </div>
+        <div class="doc-body">
+          <div class="doc-line w92"></div>
+          <div class="doc-line w78"></div>
+          <div class="doc-line w85"></div>
+          <div class="doc-line w60"></div>
+          <div class="doc-line w100 gap"></div>
+          <div class="doc-line w70"></div>
+          <div class="doc-line w85"></div>
+        </div>
+      </div>
+
+      <!-- Doc 3 — far back -->
+      <div class="doc doc-3">
+        <div class="doc-header">
+          <div class="doc-stamp">
+            <svg viewBox="0 0 16 16"><path d="M2 2h12v2H2zM2 6h8v1H2zM2 9h10v1H2zM2 12h6v1H2z"/></svg>
+          </div>
+          <div class="doc-header-lines">
+            <div class="doc-h-line1"></div>
+            <div class="doc-h-line2"></div>
+          </div>
+        </div>
+        <div class="doc-body">
+          <div class="doc-line w85"></div>
+          <div class="doc-line w70"></div>
+          <div class="doc-line w95"></div>
+          <div class="doc-line w60"></div>
+          <div class="doc-line w78 gap"></div>
+          <div class="doc-line w100"></div>
+          <div class="doc-line w85"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MARQUEE STRIP ═══ -->
+<div class="strip" aria-hidden="true">
+  <div class="strip-track">
+    <!-- duplicate set for seamless loop -->
+    <span class="strip-item"><span class="dot"></span>Lease Agreements</span>
+    <span class="strip-item"><span class="dot"></span>Freelance Contracts</span>
+    <span class="strip-item"><span class="dot"></span>Employment Terms</span>
+    <span class="strip-item"><span class="dot"></span>NDAs</span>
+    <span class="strip-item"><span class="dot"></span>Terms of Service</span>
+    <span class="strip-item"><span class="dot"></span>Vendor Agreements</span>
+    <span class="strip-item"><span class="dot"></span>Phone Contracts</span>
+    <span class="strip-item"><span class="dot"></span>Partnership Deeds</span>
+    <span class="strip-item"><span class="dot"></span>Lease Agreements</span>
+    <span class="strip-item"><span class="dot"></span>Freelance Contracts</span>
+    <span class="strip-item"><span class="dot"></span>Employment Terms</span>
+    <span class="strip-item"><span class="dot"></span>NDAs</span>
+    <span class="strip-item"><span class="dot"></span>Terms of Service</span>
+    <span class="strip-item"><span class="dot"></span>Vendor Agreements</span>
+    <span class="strip-item"><span class="dot"></span>Phone Contracts</span>
+    <span class="strip-item"><span class="dot"></span>Partnership Deeds</span>
+  </div>
+</div>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="section how" id="how">
+  <div class="section-inner">
+    <div class="how-grid">
+      <div>
+        <div class="s-label reveal">Process</div>
+        <div class="s-title reveal rd1">Three steps.<br>Total clarity.</div>
+        <div class="how-steps" style="margin-top:44px">
+          <div class="how-step reveal rd2">
+            <div class="step-n">01</div>
+            <div class="step-content">
+              <h3>Upload your document</h3>
+              <p>PDF, Word doc, or a photo. We handle leases, freelance agreements, employment contracts, NDAs, and more.</p>
+            </div>
+          </div>
+          <div class="how-step reveal rd3">
+            <div class="step-n">02</div>
+            <div class="step-content">
+              <h3>AI reads every clause</h3>
+              <p>Trained specifically on contract patterns. Flags risky language, hidden fees, one-sided terms, and legal traps in seconds.</p>
+            </div>
+          </div>
+          <div class="how-step reveal rd4">
+            <div class="step-n">03</div>
+            <div class="step-content">
+              <h3>Get your verdict</h3>
+              <p>Plain English. No jargon. What's safe, what's risky, what to push back on — and the exact words to use when negotiating.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-panel reveal rd2">
+        <div class="panel-topbar">
+          <div class="panel-dots">
+            <div class="panel-dot"></div>
+            <div class="panel-dot"></div>
+            <div class="panel-dot"></div>
+          </div>
+        </div>
+
+        <div class="panel-upload">
+          <div class="upload-icon-box">↑</div>
+          <p><strong>Drop your document here</strong><br>or click to upload</p>
+          <span>PDF · DOCX · DOC · up to 50 MB</span>
+        </div>
+
+        <div class="panel-result">
+          <div class="result-row red">
+            <span class="row-dot"></span>
+            <span class="row-text">Early termination — 3 months penalty</span>
+            <span class="row-tag">High Risk</span>
+          </div>
+          <div class="result-row amber">
+            <span class="row-dot"></span>
+            <span class="row-text">Auto-renewal — 60 day notice required</span>
+            <span class="row-tag">Caution</span>
+          </div>
+          <div class="result-row green">
+            <span class="row-dot"></span>
+            <span class="row-text">Security deposit terms are standard</span>
+            <span class="row-tag">Safe</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ WHAT WE CATCH ═══ -->
+<section class="section catches" id="features">
+  <div class="section-inner">
+    <div class="catches-header">
+      <div>
+        <div class="s-label reveal">Coverage</div>
+        <div class="s-title reveal rd1">What Clarifai catches</div>
+      </div>
+      <p class="s-body reveal rd2">Every clause type that routinely traps people who sign without understanding. We look for all of them, every time.</p>
+    </div>
+
+    <div class="catch-grid reveal">
+      <div class="catch-cell">
+        <div class="catch-icon">⛓</div>
+        <div class="catch-name">Penalty Clauses</div>
+        <div class="catch-desc">Hidden fees for ending a contract, missing a deadline, or changing your mind.</div>
+      </div>
+      <div class="catch-cell">
+        <div class="catch-icon">🔁</div>
+        <div class="catch-name">Auto-Renewals</div>
+        <div class="catch-desc">Agreements that silently restart unless you cancel within a tiny window.</div>
+      </div>
+      <div class="catch-cell">
+        <div class="catch-icon">⚖️</div>
+        <div class="catch-name">Liability Waivers</div>
+        <div class="catch-desc">Language that strips away your legal rights if something goes wrong.</div>
+      </div>
+      <div class="catch-cell">
+        <div class="catch-icon">🔒</div>
+        <div class="catch-name">Non-Compete Terms</div>
+        <div class="catch-desc">Restrictions on your ability to work for others or start your own business.</div>
+      </div>
+      <div class="catch-cell">
+        <div class="catch-icon">🚫</div>
+        <div class="catch-name">Arbitration Clauses</div>
+        <div class="catch-desc">Clauses forcing you into private arbitration instead of court — often unfair.</div>
+      </div>
+      <div class="catch-cell">
+        <div class="catch-icon">💸</div>
+        <div class="catch-name">Hidden Fee Structures</div>
+        <div class="catch-desc">Charges buried deep in the document that only appear later in billing.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING ═══ -->
+<section class="section pricing" id="pricing">
+  <div class="section-inner">
+    <div class="s-label reveal">Pricing</div>
+    <div class="s-title reveal rd1">Pay only when you need it.</div>
+    <p class="s-body reveal rd2">No subscriptions unless you want one. Most people upload two documents, find a problem, and never look at a contract the same way again.</p>
+
+    <div class="pricing-grid reveal rd2">
+      <div class="plan">
+        <div class="plan-tag">Free</div>
+        <div class="plan-name">Trial</div>
+        <div class="plan-desc">Try it with zero commitment. See for yourself.</div>
+        <div class="plan-price">
+          <span class="p-sym">$</span>
+          <span class="p-num">0</span>
+        </div>
+        <ul class="plan-list">
+          <li>2 full document analyses</li>
+          <li>Risk flags & plain-English summary</li>
+          <li>Overall safety verdict</li>
+          <li>PDF & DOCX support</li>
+        </ul>
+        <button class="plan-cta ghost">Get Started Free</button>
+      </div>
+
+      <div class="plan featured">
+        <div class="plan-tag">Most Popular</div>
+        <div class="plan-name">Per Document</div>
+        <div class="plan-desc">Perfect for anyone signing a few important things a year.</div>
+        <div class="plan-price">
+          <span class="p-sym">$</span>
+          <span class="p-num">5</span>
+          <span class="p-per">per document</span>
+        </div>
+        <ul class="plan-list">
+          <li>Full clause-by-clause analysis</li>
+          <li>Risk score for every section</li>
+          <li>Suggested rewrite wording</li>
+          <li>Key terms glossary</li>
+          <li>Downloadable PDF report</li>
+        </ul>
+        <button class="plan-cta solid">Analyze Now →</button>
+      </div>
+
+      <div class="plan">
+        <div class="plan-tag">Unlimited</div>
+        <div class="plan-name">Freelancer</div>
+        <div class="plan-desc">For people who sign client contracts constantly.</div>
+        <div class="plan-price">
+          <span class="p-sym">$</span>
+          <span class="p-num">12</span>
+          <span class="p-per">/ month</span>
+        </div>
+        <ul class="plan-list">
+          <li>Unlimited analyses</li>
+          <li>Everything in Per Document</li>
+          <li>Document history & storage</li>
+          <li>Side-by-side comparison</li>
+          <li>Priority processing</li>
+        </ul>
+        <button class="plan-cta ghost">Start Unlimited</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-sect">
+  <div class="cta-glow"></div>
+  <div class="s-label reveal" style="justify-content:center">Start Now</div>
+  <div class="s-title reveal rd1">
+    Your next signature<br>
+    should be an<br>
+    <span style="color:var(--v2)">informed one.</span>
+  </div>
+  <p class="s-body reveal rd2">Upload your first document free. No account, no card. Just upload and read your results in under ten seconds.</p>
+  <div class="cta-actions reveal rd3">
+    <button class="btn-main">Analyze My Document →</button>
+    <button class="nav-btn">See a sample</button>
+  </div>
+  <p class="cta-fine reveal rd4">2 free · No credit card · Results in &lt;10s</p>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">Clarif<em>ai</em></div>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">How it works</a>
+      <a href="#">Pricing</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="footer-copy">© 2025 Clarifai</div>
+  </div>
+</footer>
+
+<script>
+/* ── CURSOR ── */
+const cur = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0, my=0, rx=0, ry=0;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.left = mx + 'px';
+  cur.style.top  = my + 'px';
+});
+
+(function trackRing() {
+  rx += (mx - rx) * 0.14;
+  ry += (my - ry) * 0.14;
+  ring.style.left = rx + 'px';
+  ring.style.top  = ry + 'px';
+  requestAnimationFrame(trackRing);
+})();
+
+document.querySelectorAll('button, a, .panel-upload, .catch-cell, .plan, .how-step').forEach(el => {
+  el.addEventListener('mouseenter', () => document.body.classList.add('hovering'));
+  el.addEventListener('mouseleave', () => document.body.classList.remove('hovering'));
+});
+
+/* ── THEME TOGGLE ── */
+const toggle = document.getElementById('themeToggle');
+const html = document.documentElement;
+
+toggle.addEventListener('click', () => {
+  html.setAttribute('data-theme',
+    html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+  );
+});
+
+/* ── NAV SCROLL ── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
+});
+
+/* ── SCROLL REVEAL ── */
+const revealEls = document.querySelectorAll('.reveal');
+const ro = new IntersectionObserver(entries => {
+  entries.forEach(e => e.isIntersecting && e.target.classList.add('on'));
+}, { threshold: 0.1 });
+revealEls.forEach(el => ro.observe(el));
+
+/* ── SUBTLE MOUSE PARALLAX on hero docs ── */
+const scene = document.querySelector('.docs-scene');
+document.addEventListener('mousemove', e => {
+  if (!scene) return;
+  const nx = (e.clientX / window.innerWidth  - 0.5) * 14;
+  const ny = (e.clientY / window.innerHeight - 0.5) * 10;
+  scene.style.transform = `rotateY(${nx}deg) rotateX(${-ny}deg)`;
+});
+</script>
+</body>
+</html>
